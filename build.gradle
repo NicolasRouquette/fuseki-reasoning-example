@@ -1,0 +1,35 @@
+subprojects {
+	group = 'io.opencaesar.owl'
+	version = '3.0.0'
+	
+	ext.versions = [
+		xmlresolver: '1.2',
+		jcommander: '1.82',
+		jena: '4.9.0'
+	]
+
+	repositories {
+    	mavenLocal()
+  		mavenCentral()
+	}
+	
+	apply plugin: 'java'
+	apply plugin: 'eclipse'
+	apply plugin: 'idea'
+		
+	sourceCompatibility = '11'
+	targetCompatibility = '11'
+
+	java {
+	    withJavadocJar()
+	    withSourcesJar()
+	}
+
+	tasks.named('jar') {
+	    manifest {
+	        attributes('Implementation-Title': project.name,
+	                   'Implementation-Version': project.version)
+	    }
+	}
+
+}

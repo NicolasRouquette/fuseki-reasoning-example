@@ -1,0 +1,27 @@
+# This should include jena-core/src/main/resources/etc/owl-fb.rules
+
+@prefix mission: <http://example.com/tutorial/vocabulary/mission#>
+@prefix oml: <http://opencaesar.io/oml#>
+
+[missionPresents:
+    (?r rdf:type mission:Presents),
+    (?r oml:hasSource ?s),
+    (?r oml:hasTarget ?t)
+    ->
+    (?s mission:presents ?t)
+]
+
+#------------------------------------------------------------------
+# RDFS Closure rules
+#------------------------------------------------------------------
+
+[rdfs7:  (?a rdf:type rdfs:Class) -> (?a rdfs:subClassOf ?a)]
+[rdfs8:  (?a rdfs:subClassOf ?b), (?b rdfs:subClassOf ?c) -> (?a rdfs:subClassOf ?c)]
+[rdfs9:  (?x rdfs:subClassOf ?y), (?a rdf:type ?x) -> (?a rdf:type ?y)]
+
+#------------------------------------------------------------------
+# OWL axioms
+#------------------------------------------------------------------
+
+-> (owl:Class rdfs:subClassOf rdfs:Class).
+-> (owl:Restriction rdfs:subClassOf owl:Class).
