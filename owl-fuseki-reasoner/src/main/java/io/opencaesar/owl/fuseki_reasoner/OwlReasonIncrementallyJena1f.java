@@ -14,6 +14,7 @@ import org.apache.jena.riot.Lang;
 import org.apache.jena.riot.RDFLanguages;
 import org.apache.jena.sys.JenaSystem;
 import org.apache.jena.system.Txn;
+import org.apache.jena.tdb2.TDB2;
 import org.apache.jena.tdb2.TDB2Factory;
 import org.apache.jena.update.UpdateAction;
 import org.apache.jena.update.UpdateFactory;
@@ -33,7 +34,7 @@ import java.util.stream.Collectors;
 /**
  * Experiments with incremental reasoning.
  */
-public class OwlReasonIncrementallyJena1d {
+public class OwlReasonIncrementallyJena1f {
 
     /**
      * The default OWL file extensions
@@ -73,7 +74,7 @@ public class OwlReasonIncrementallyJena1d {
 
         System.out.println("Logger Factory: " + loggerFactoryClassStr);
 
-        final OwlReasonIncrementallyJena1d app = new OwlReasonIncrementallyJena1d();
+        final OwlReasonIncrementallyJena1f app = new OwlReasonIncrementallyJena1f();
         final JCommander builder = JCommander.newBuilder().addObject(app.options).build();
         builder.parse(args);
         if (app.options.help) {
@@ -83,7 +84,7 @@ public class OwlReasonIncrementallyJena1d {
         app.run1();
     }
 
-    public OwlReasonIncrementallyJena1d() {
+    public OwlReasonIncrementallyJena1f() {
         JenaSystem.init();
     }
 
@@ -115,33 +116,6 @@ public class OwlReasonIncrementallyJena1d {
             });
         }
 
-        // Create a union model and set it as the default model of the dataset.
-        // tried some alternatives unsuccessfully.
-
-        // OwlReasonIncrementallyJena1e: set the union graph instead of constructing the union manually,
-        //
-        // Txn.executeWrite(ds0, () -> {
-        //    ds0.getContext().setTrue(TDB2.symUnionDefaultGraph);
-        // });
-
-        // OwlReasonIncrementallyJena1f: set the union graph in the query execution.
-        //
-        //         try (QueryExecution qexec = QueryExecutionFactory.create(query, ds)) {
-        //            qexec.getContext().set(TDB2.symUnionDefaultGraph, true);
-        //            ResultSet results = qexec.execSelect();
-
-        Model unionModel = ModelFactory.createDefaultModel();
-        Txn.executeRead(ds0, () -> {
-            Iterator<Resource> it = ds0.listModelNames();
-            while (it.hasNext()) {
-                Resource r = it.next();
-                unionModel.add(ds0.getNamedModel(r));
-            }
-        });
-        Txn.executeWrite(ds0, () -> {
-            ds0.setDefaultModel(unionModel);
-        });
-
         Txn.executeRead(ds0, () -> {
             LOGGER.info("ds0: Check how many results we get querying named graphs.");
             queryString("SELECT ?g ?s ?p ?o { GRAPH ?g { ?s ?p ?o} }", ds0, false);
@@ -170,7 +144,7 @@ public class OwlReasonIncrementallyJena1d {
             LOGGER.info("before insertion ds1: Check how many results we get querying named graphs.");
             queryString("SELECT ?g ?s ?p ?o { GRAPH ?g { ?s ?p ?o} }", ds1, false);
             LOGGER.info("before insertion ds1: Check how many results we get querying the union graph.");
-            queryString("SELECT * {?s ?p ?o}", ds1, false);
+            queryString("SELECT * {?s ?p ?o}", ds1, true);
             LOGGER.info("before insertion ds1: Check named graphs for patterns: ?x mission:presents ?y.");
             queryPresentsByGraph(ds1, true);
             LOGGER.info("before insertion ds1: Check union graph for patterns: ?x mission:presents ?y.");
@@ -258,6 +232,7 @@ public class OwlReasonIncrementallyJena1d {
         Query query = QueryFactory.create(queryString);
         int nbRows = 0;
         try (QueryExecution qexec = QueryExecutionFactory.create(query, ds)) {
+            qexec.getContext().set(TDB2.symUnionDefaultGraph, true);
             ResultSet results = qexec.execSelect();
             List<String> vars = results.getResultVars();
             for (; results.hasNext(); ) {

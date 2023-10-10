@@ -21,6 +21,13 @@ io.opencaesar.owl.fuseki_reasoner.OwlReasonIncrementallyJena1d \
 -c owl-fuseki-reasoner/src/main/resources/owl-ventailments/catalog.xml
 ```
 
+Note: There are variations of this code that attempt at using the Jena APIs for the union graph instead of constructing a union explicitly.
+These alternatives are unsuccessful in that the queries before SPARQL updates do not produce the expected results.
+The differences with [OwlReasonIncrementallyJena1d](java/io/opencaesar/owl/fuseki_reasoner/OwlReasonIncrementallyJena1d.java) 
+are minimized to facilitate comparison.
+- [OwlReasonIncrementallyJena1e](java/io/opencaesar/owl/fuseki_reasoner/OwlReasonIncrementallyJena1e.java)
+- [OwlReasonIncrementallyJena1f](java/io/opencaesar/owl/fuseki_reasoner/OwlReasonIncrementallyJena1f.java)
+
 This code does the following:
 
 ## 1) Create an in-memory TDB2 dataset.

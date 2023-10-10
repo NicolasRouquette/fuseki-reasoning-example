@@ -14,6 +14,7 @@ import org.apache.jena.riot.Lang;
 import org.apache.jena.riot.RDFLanguages;
 import org.apache.jena.sys.JenaSystem;
 import org.apache.jena.system.Txn;
+import org.apache.jena.tdb2.TDB2;
 import org.apache.jena.tdb2.TDB2Factory;
 import org.apache.jena.update.UpdateAction;
 import org.apache.jena.update.UpdateFactory;
@@ -33,7 +34,7 @@ import java.util.stream.Collectors;
 /**
  * Experiments with incremental reasoning.
  */
-public class OwlReasonIncrementallyJena1d {
+public class OwlReasonIncrementallyJena1e {
 
     /**
      * The default OWL file extensions
@@ -73,7 +74,7 @@ public class OwlReasonIncrementallyJena1d {
 
         System.out.println("Logger Factory: " + loggerFactoryClassStr);
 
-        final OwlReasonIncrementallyJena1d app = new OwlReasonIncrementallyJena1d();
+        final OwlReasonIncrementallyJena1e app = new OwlReasonIncrementallyJena1e();
         final JCommander builder = JCommander.newBuilder().addObject(app.options).build();
         builder.parse(args);
         if (app.options.help) {
@@ -83,7 +84,7 @@ public class OwlReasonIncrementallyJena1d {
         app.run1();
     }
 
-    public OwlReasonIncrementallyJena1d() {
+    public OwlReasonIncrementallyJena1e() {
         JenaSystem.init();
     }
 
@@ -115,31 +116,9 @@ public class OwlReasonIncrementallyJena1d {
             });
         }
 
-        // Create a union model and set it as the default model of the dataset.
-        // tried some alternatives unsuccessfully.
-
-        // OwlReasonIncrementallyJena1e: set the union graph instead of constructing the union manually,
-        //
-        // Txn.executeWrite(ds0, () -> {
-        //    ds0.getContext().setTrue(TDB2.symUnionDefaultGraph);
-        // });
-
-        // OwlReasonIncrementallyJena1f: set the union graph in the query execution.
-        //
-        //         try (QueryExecution qexec = QueryExecutionFactory.create(query, ds)) {
-        //            qexec.getContext().set(TDB2.symUnionDefaultGraph, true);
-        //            ResultSet results = qexec.execSelect();
-
-        Model unionModel = ModelFactory.createDefaultModel();
-        Txn.executeRead(ds0, () -> {
-            Iterator<Resource> it = ds0.listModelNames();
-            while (it.hasNext()) {
-                Resource r = it.next();
-                unionModel.add(ds0.getNamedModel(r));
-            }
-        });
+        // union graph results in no results on querying ds1 below.
         Txn.executeWrite(ds0, () -> {
-            ds0.setDefaultModel(unionModel);
+            ds0.getContext().setTrue(TDB2.symUnionDefaultGraph);
         });
 
         Txn.executeRead(ds0, () -> {
@@ -180,7 +159,7 @@ public class OwlReasonIncrementallyJena1d {
             LOGGER.info("statements (inf)  = " + infModel1.getGraph().size());
         });
 
-        Txn.executeWrite(ds1, () -> {
+        Txn.executeWrite(ds0, () -> {
             UpdateRequest request = UpdateFactory.create();
             request.add(
                     "INSERT DATA { GRAPH <http://example.com/tutorial/description/una1#> {" +
@@ -190,28 +169,31 @@ public class OwlReasonIncrementallyJena1d {
                             "<http://opencaesar.io/oml#hasSource> <http://example.com/tutorial/description/una1#I1> . " +
                             "} }");
             LOGGER.info("INSERT...");
-            UpdateAction.execute(request, ds1);
+            UpdateAction.execute(request, ds0);
         });
 
-        Txn.executeRead(ds1, () -> {
+        InfModel infModel2 = ModelFactory.createInfModel(gr, baseModel);
+        Dataset ds2 = DatasetFactory.create(infModel2);
+
+        Txn.executeRead(ds2, () -> {
             LOGGER.info("after insertion ds1: Check how many results we get querying named graphs.");
-            queryString("SELECT ?g ?s ?p ?o { GRAPH ?g { ?s ?p ?o} }", ds1, true);
-            LOGGER.info("after insertion ds1: Check how many results we get querying the union graph.");
-            queryString("SELECT * {?s ?p ?o}", ds1, false);
-            LOGGER.info("after insertion ds1: Check named graphs for patterns: ?x mission:presents ?y.");
-            queryPresentsByGraph(ds1, true);
-            LOGGER.info("after insertion ds1: Check union graph for patterns: ?x mission:presents ?y.");
-            queryPresentsByUnion(ds1, true);
-            LOGGER.info("after insertion ds1: Check union graph for patterns: ?x a mission:Component; ?x a ?t.");
+            queryString("SELECT ?g ?s ?p ?o { GRAPH ?g { ?s ?p ?o} }", ds2, true);
+            LOGGER.info("after insertion ds2: Check how many results we get querying the union graph.");
+            queryString("SELECT * {?s ?p ?o}", ds2, false);
+            LOGGER.info("after insertion ds2: Check named graphs for patterns: ?x mission:presents ?y.");
+            queryPresentsByGraph(ds2, true);
+            LOGGER.info("after insertion ds2: Check union graph for patterns: ?x mission:presents ?y.");
+            queryPresentsByUnion(ds2, true);
+            LOGGER.info("after insertion ds2: Check union graph for patterns: ?x a mission:Component; ?x a ?t.");
             String query1 = "PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>\n"
                     + "PREFIX mission:     <http://example.com/tutorial/vocabulary/mission#>"
                     + "SELECT * {?s a mission:Component; a ?t }";
-            queryString(query1, ds1, true);
-            LOGGER.info("after insertion ds1: Check named graphs for patterns: ?x a mission:Component; ?x a ?t.");
+            queryString(query1, ds2, true);
+            LOGGER.info("after insertion ds2: Check named graphs for patterns: ?x a mission:Component; ?x a ?t.");
             String query2 = "PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>\n"
                     + "PREFIX mission:     <http://example.com/tutorial/vocabulary/mission#>"
                     + "SELECT * { GRAPH ?g { ?s a mission:Component; a ?t } }";
-            queryString(query2, ds1, true);
+            queryString(query2, ds2, true);
             LOGGER.info("statements (base) = " + baseModel.getGraph().size());
             LOGGER.info("statements (inf)  = " + infModel1.getGraph().size());
         });

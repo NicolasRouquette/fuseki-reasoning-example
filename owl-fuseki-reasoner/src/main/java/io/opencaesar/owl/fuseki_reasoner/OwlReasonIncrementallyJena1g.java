@@ -33,7 +33,7 @@ import java.util.stream.Collectors;
 /**
  * Experiments with incremental reasoning.
  */
-public class OwlReasonIncrementallyJena1d {
+public class OwlReasonIncrementallyJena1g {
 
     /**
      * The default OWL file extensions
@@ -73,7 +73,7 @@ public class OwlReasonIncrementallyJena1d {
 
         System.out.println("Logger Factory: " + loggerFactoryClassStr);
 
-        final OwlReasonIncrementallyJena1d app = new OwlReasonIncrementallyJena1d();
+        final OwlReasonIncrementallyJena1g app = new OwlReasonIncrementallyJena1g();
         final JCommander builder = JCommander.newBuilder().addObject(app.options).build();
         builder.parse(args);
         if (app.options.help) {
@@ -83,7 +83,7 @@ public class OwlReasonIncrementallyJena1d {
         app.run1();
     }
 
-    public OwlReasonIncrementallyJena1d() {
+    public OwlReasonIncrementallyJena1g() {
         JenaSystem.init();
     }
 
