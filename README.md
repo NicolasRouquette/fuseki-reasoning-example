@@ -10,14 +10,14 @@ How do we achieve the above?
 This example is an experiment to explore how to achieve the above using the Fuseki API.
 Once we managed to do this, the next question is how to achieve this functionality via a Fuseki server configuration.
 
-To run in IntelliJ, use the 'OwlReasonIncrementallyJena1d' run configuration.
+To run in IntelliJ, use the 'OwlReasonIncrementallyJena2f' run configuration.
 
 It is equivalent to executing:
 
 ```shell
 java \
 -Dlog4j.debug=false -Dlog4j.configurationFile=classpath:log4j2.properties \
-io.opencaesar.owl.fuseki_reasoner.OwlReasonIncrementallyJena1d \
+io.opencaesar.owl.fuseki_reasoner.OwlReasonIncrementallyJena2f \
 -c owl-fuseki-reasoner/src/main/resources/owl-ventailments/catalog.xml
 ```
 
@@ -27,6 +27,33 @@ The differences with [OwlReasonIncrementallyJena1d](java/io/opencaesar/owl/fusek
 are minimized to facilitate comparison.
 - [OwlReasonIncrementallyJena1e](java/io/opencaesar/owl/fuseki_reasoner/OwlReasonIncrementallyJena1e.java)
 - [OwlReasonIncrementallyJena1f](java/io/opencaesar/owl/fuseki_reasoner/OwlReasonIncrementallyJena1f.java)
+- [OwlReasonIncrementallyJena1g](java/io/opencaesar/owl/fuseki_reasoner/OwlReasonIncrementallyJena1g.java)
+
+[OwlReasonIncrementallyJena2f](java/io/opencaesar/owl/fuseki_reasoner/OwlReasonIncrementallyJena2f.java) is the closest to the desired behavior.
+After a SPARQL insert update, we observe the following filtered results where we show only truples involving either `mission:presents`, `oml:hasSource`, or `oml:hasTarget`:
+
+```text
+11:29:10.273 [main] INFO  io.opencaesar.owl.fuseki_reasoner.OwlReasonIncrementallyJena2f - after insertion ds2: Check how many results we get querying the union graph.
+11:29:10.273 [main] INFO  io.opencaesar.owl.fuseki_reasoner.OwlReasonIncrementallyJena2f - <<< query: SELECT * {?s ?p ?o}
+11:29:10.283 [main] INFO  io.opencaesar.owl.fuseki_reasoner.OwlReasonIncrementallyJena2f -  s=http://example.com/tutorial/description/una1#C2 p=http://example.com/tutorial/vocabulary/mission#presents o=http://example.com/tutorial/description/una1#I2
+11:29:10.283 [main] INFO  io.opencaesar.owl.fuseki_reasoner.OwlReasonIncrementallyJena2f -  s=http://example.com/tutorial/description/una1#C1 p=http://example.com/tutorial/vocabulary/mission#presents o=http://example.com/tutorial/description/una1#I1
+11:29:10.283 [main] INFO  io.opencaesar.owl.fuseki_reasoner.OwlReasonIncrementallyJena2f -  s=http://example.com/tutorial/description/una1#C3 p=http://example.com/tutorial/vocabulary/mission#presents o=http://example.com/tutorial/description/una1#I3
+11:29:10.284 [main] INFO  io.opencaesar.owl.fuseki_reasoner.OwlReasonIncrementallyJena2f -  s=http://example.com/tutorial/description/una1#C2.I2 p=http://opencaesar.io/oml#hasTarget o=http://example.com/tutorial/description/una1#I2
+11:29:10.284 [main] INFO  io.opencaesar.owl.fuseki_reasoner.OwlReasonIncrementallyJena2f -  s=http://example.com/tutorial/description/una1#C2.I2 p=http://opencaesar.io/oml#hasSource o=http://example.com/tutorial/description/una1#C2
+11:29:10.285 [main] INFO  io.opencaesar.owl.fuseki_reasoner.OwlReasonIncrementallyJena2f -  s=http://example.com/tutorial/description/una1#C3.I3 p=http://opencaesar.io/oml#hasTarget o=http://example.com/tutorial/description/una1#I3
+11:29:10.285 [main] INFO  io.opencaesar.owl.fuseki_reasoner.OwlReasonIncrementallyJena2f -  s=http://example.com/tutorial/description/una1#C3.I3 p=http://opencaesar.io/oml#hasSource o=http://example.com/tutorial/description/una1#C3
+11:29:10.285 [main] INFO  io.opencaesar.owl.fuseki_reasoner.OwlReasonIncrementallyJena2f -  s=http://example.com/tutorial/description/una1#C1.I1 p=http://opencaesar.io/oml#hasTarget o=http://example.com/tutorial/description/una1#I1
+11:29:10.285 [main] INFO  io.opencaesar.owl.fuseki_reasoner.OwlReasonIncrementallyJena2f -  s=http://example.com/tutorial/description/una1#C1.I1 p=http://opencaesar.io/oml#hasSource o=http://example.com/tutorial/description/una1#C1
+11:29:10.285 [main] INFO  io.opencaesar.owl.fuseki_reasoner.OwlReasonIncrementallyJena2f -  s=http://example.com/tutorial/description/una1#C4.I1 p=http://opencaesar.io/oml#hasTarget o=http://example.com/tutorial/description/una1#I1
+11:29:10.285 [main] INFO  io.opencaesar.owl.fuseki_reasoner.OwlReasonIncrementallyJena2f -  s=http://example.com/tutorial/description/una1#C4.I1 p=http://opencaesar.io/oml#hasSource o=http://example.com/tutorial/description/una1#C4
+11:29:10.285 [main] INFO  io.opencaesar.owl.fuseki_reasoner.OwlReasonIncrementallyJena2f - >>> query (218 results)
+```
+
+The above indicates that the reasoner did not run, otherwise the `missionPresents` rule would have generated a result like this:
+
+```text
+s=http://example.com/tutorial/description/una1#C4 p=http://example.com/tutorial/vocabulary/mission#presents o=http://example.com/tutorial/description/una1#I1
+```
 
 This code does the following:
 

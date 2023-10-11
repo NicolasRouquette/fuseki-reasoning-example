@@ -4,16 +4,24 @@ import com.beust.jcommander.IParameterValidator;
 import com.beust.jcommander.JCommander;
 import com.beust.jcommander.Parameter;
 import com.beust.jcommander.ParameterException;
+import org.apache.jena.dboe.base.file.Location;
+import org.apache.jena.graph.Graph;
+import org.apache.jena.graph.Node;
+import org.apache.jena.graph.NodeFactory;
 import org.apache.jena.ontology.OntDocumentManager;
 import org.apache.jena.query.*;
 import org.apache.jena.rdf.model.*;
+import org.apache.jena.rdf.model.impl.StatementImpl;
 import org.apache.jena.reasoner.Reasoner;
 import org.apache.jena.reasoner.rulesys.GenericRuleReasoner;
 import org.apache.jena.reasoner.rulesys.GenericRuleReasonerFactory;
 import org.apache.jena.riot.Lang;
 import org.apache.jena.riot.RDFLanguages;
+import org.apache.jena.sparql.core.DatasetGraph;
 import org.apache.jena.sys.JenaSystem;
 import org.apache.jena.system.Txn;
+import org.apache.jena.tdb2.DatabaseMgr;
+import org.apache.jena.tdb2.TDB2;
 import org.apache.jena.tdb2.TDB2Factory;
 import org.apache.jena.update.UpdateAction;
 import org.apache.jena.update.UpdateFactory;
@@ -65,7 +73,7 @@ public class OwlReasonIncrementallyJena1g {
 
     private final Options options = new Options();
 
-    static final Logger LOGGER = LoggerFactory.getLogger("io.opencaesar.owl.fuseki_reasoner.OwlReasonIncrementallyJena1d");
+    static final Logger LOGGER = LoggerFactory.getLogger("io.opencaesar.owl.fuseki_reasoner.OwlReasonIncrementallyJena1g");
 
     public static void main(String[] args) throws Exception {
         ILoggerFactory loggerFactory = LoggerFactory.getILoggerFactory();
@@ -87,6 +95,19 @@ public class OwlReasonIncrementallyJena1g {
         JenaSystem.init();
     }
 
+    private void setDefaultModelToUnion(Dataset ds) {
+        Model unionModel = ModelFactory.createDefaultModel();
+        Txn.executeRead(ds, () -> {
+            Iterator<Resource> it = ds.listModelNames();
+            while (it.hasNext()) {
+                Resource r = it.next();
+                unionModel.add(ds.getNamedModel(r));
+            }
+        });
+        Txn.executeWrite(ds, () -> {
+            ds.setDefaultModel(unionModel);
+        });
+    }
 
     private void run1() throws Exception {
 
@@ -104,13 +125,15 @@ public class OwlReasonIncrementallyJena1g {
             options.inputOntologyIris.addAll(fileMap.keySet());
         }
 
-        Dataset ds0 = TDB2Factory.createDataset();
+        // replacement for:
+        // Dataset ds0 = TDB2Factory.createDataset();
+        DatasetGraph dsg0 = DatabaseMgr.connectDatasetGraph(Location.mem());
 
         for (var iri : options.inputOntologyIris) {
-            Txn.executeWrite(ds0, () -> {
+            Txn.executeWrite(dsg0, () -> {
                 Model m = ModelFactory.createDefaultModel();
                 fm.readModelInternal(m, iri);
-                ds0.addNamedModel(iri, m);
+                dsg0.addGraph(NodeFactory.createURI(iri), m.getGraph());
                 LOGGER.info("Loading named graph: " + iri);
             });
         }
@@ -130,26 +153,19 @@ public class OwlReasonIncrementallyJena1g {
         //            qexec.getContext().set(TDB2.symUnionDefaultGraph, true);
         //            ResultSet results = qexec.execSelect();
 
-        Model unionModel = ModelFactory.createDefaultModel();
-        Txn.executeRead(ds0, () -> {
-            Iterator<Resource> it = ds0.listModelNames();
-            while (it.hasNext()) {
-                Resource r = it.next();
-                unionModel.add(ds0.getNamedModel(r));
-            }
-        });
-        Txn.executeWrite(ds0, () -> {
-            ds0.setDefaultModel(unionModel);
-        });
+        // There are no APIs to set the default union model in a DatasetGraph.
+        // setDefaultModelToUnion(dsg0);
 
-        Txn.executeRead(ds0, () -> {
+         Txn.executeWrite(dsg0, () -> {
+            dsg0.getContext().setTrue(TDB2.symUnionDefaultGraph);
+         });
+
+        Txn.executeRead(dsg0, () -> {
             LOGGER.info("ds0: Check how many results we get querying named graphs.");
-            queryString("SELECT ?g ?s ?p ?o { GRAPH ?g { ?s ?p ?o} }", ds0, false);
+            queryString("SELECT ?g ?s ?p ?o { GRAPH ?g { ?s ?p ?o} }", dsg0, false);
             LOGGER.info("ds0: Check how many results we get querying the union graph.");
-            queryString("SELECT * {?s ?p ?o}", ds0, false);
+            queryString("SELECT * {?s ?p ?o}", dsg0, false);
         });
-
-        Model baseModel = ds0.getDefaultModel();
 
         Resource cr = ModelFactory.createDefaultModel().createResource();
         cr.addProperty(ReasonerVocabulary.PROPderivationLogging, "true");
@@ -160,6 +176,7 @@ public class OwlReasonIncrementallyJena1g {
         cr.addProperty(ReasonerVocabulary.PROPruleSet, "owl-fuseki-reasoner/src/main/resources/mission.rules");
         Reasoner gr = GenericRuleReasonerFactory.theInstance().create(cr);
 
+        Model baseModel = ModelFactory.createModelForGraph(dsg0.getDefaultGraph());
         InfModel infModel1 = ModelFactory.createInfModel(gr, baseModel);
 
         // Wrapping the infModel results in an unsupportedMethod exception when executing SPARQL queries.
@@ -180,18 +197,20 @@ public class OwlReasonIncrementallyJena1g {
             LOGGER.info("statements (inf)  = " + infModel1.getGraph().size());
         });
 
-        Txn.executeWrite(ds1, () -> {
+        Txn.executeWrite(dsg0, () -> {
             UpdateRequest request = UpdateFactory.create();
             request.add(
                     "INSERT DATA { GRAPH <http://example.com/tutorial/description/una1#> {" +
                             "<http://example.com/tutorial/description/una1#C4> a <http://imce.jpl.nasa.gov/foundation/mission#Component> . " +
                             "<http://example.com/tutorial/description/una1#C4.I1> a <http://imce.jpl.nasa.gov/foundation/mission#Presents> ; " +
                             "<http://opencaesar.io/oml#hasSource> <http://example.com/tutorial/description/una1#C4> ; " +
-                            "<http://opencaesar.io/oml#hasSource> <http://example.com/tutorial/description/una1#I1> . " +
+                            "<http://opencaesar.io/oml#hasTarget> <http://example.com/tutorial/description/una1#I1> . " +
                             "} }");
             LOGGER.info("INSERT...");
-            UpdateAction.execute(request, ds1);
+            UpdateAction.execute(request, dsg0);
         });
+
+//        setDefaultModelToUnion(ds1);
 
         Txn.executeRead(ds1, () -> {
             LOGGER.info("after insertion ds1: Check how many results we get querying named graphs.");
@@ -216,17 +235,17 @@ public class OwlReasonIncrementallyJena1g {
             LOGGER.info("statements (inf)  = " + infModel1.getGraph().size());
         });
 
-        Txn.executeWrite(ds0, () -> {
+        Txn.executeWrite(dsg0, () -> {
             UpdateRequest request = UpdateFactory.create();
             request.add(
                     "DELETE DATA { GRAPH <http://example.com/tutorial/description/una1#> {" +
                             "<http://example.com/tutorial/description/una1#C4> a <http://imce.jpl.nasa.gov/foundation/mission#Component> . " +
                             "<http://example.com/tutorial/description/una1#C4.I1> a <http://imce.jpl.nasa.gov/foundation/mission#Presents> ; " +
                             "<http://opencaesar.io/oml#hasSource> <http://example.com/tutorial/description/una1#C4> ; " +
-                            "<http://opencaesar.io/oml#hasSource> <http://example.com/tutorial/description/una1#I1> . " +
+                            "<http://opencaesar.io/oml#hasTarget> <http://example.com/tutorial/description/una1#I1> . " +
                             "} }");
             LOGGER.info("DELETE...");
-            UpdateAction.execute(request, ds0);
+            UpdateAction.execute(request, dsg0);
         });
 
         Txn.executeRead(ds1, () -> {
@@ -277,6 +296,7 @@ public class OwlReasonIncrementallyJena1g {
         LOGGER.info(">>> query (" + nbRows + " results)");
     }
 
+
     private void queryPresentsByGraph(Dataset ds, boolean showResults) {
         String queryString = String
                 .format("PREFIX mission: <http://example.com/tutorial/vocabulary/mission#>\n"
@@ -284,6 +304,7 @@ public class OwlReasonIncrementallyJena1g {
                         + "ORDER BY ?g ?c ?i");
         queryString(queryString, ds, showResults);
     }
+
 
     private void queryPresentsByUnion(Dataset ds, boolean showResults) {
         String queryString = String
@@ -293,6 +314,44 @@ public class OwlReasonIncrementallyJena1g {
         queryString(queryString, ds, showResults);
     }
 
+    private void queryString(String queryString, DatasetGraph dsg, boolean showResults) {
+        LOGGER.info("<<< query: " + queryString);
+        Query query = QueryFactory.create(queryString);
+        int nbRows = 0;
+        try (QueryExecution qexec = QueryExecutionFactory.create(query, dsg)) {
+            ResultSet results = qexec.execSelect();
+            List<String> vars = results.getResultVars();
+            for (; results.hasNext(); ) {
+                QuerySolution soln = results.nextSolution();
+                if (showResults) {
+                    StringBuffer buff = new StringBuffer();
+                    for (String var : vars) {
+                        RDFNode value = soln.get(var);
+                        buff.append(" " + var + "=" + value);
+                    }
+                    LOGGER.info(buff.toString());
+                }
+                nbRows = results.getRowNumber();
+            }
+        }
+
+        LOGGER.info(">>> query (" + nbRows + " results)");
+    }
+
+    private void queryPresentsByGraph(DatasetGraph dsg, boolean showResults) {
+        String queryString = String
+                .format("PREFIX mission: <http://example.com/tutorial/vocabulary/mission#>\n"
+                        + "SELECT ?g ?c ?i WHERE { GRAPH ?g { ?c mission:presents ?i . } }\n"
+                        + "ORDER BY ?g ?c ?i");
+        queryString(queryString, dsg, showResults);
+    }
+    private void queryPresentsByUnion(DatasetGraph dsg, boolean showResults) {
+        String queryString = String
+                .format("PREFIX mission: <http://example.com/tutorial/vocabulary/mission#>\n"
+                        + "SELECT ?c ?i WHERE { ?c mission:presents ?i . }\n"
+                        + "ORDER BY ?c ?i");
+        queryString(queryString, dsg, showResults);
+    }
     //--------
 
     /**

@@ -187,7 +187,7 @@ public class OwlReasonIncrementallyJena1d {
                             "<http://example.com/tutorial/description/una1#C4> a <http://imce.jpl.nasa.gov/foundation/mission#Component> . " +
                             "<http://example.com/tutorial/description/una1#C4.I1> a <http://imce.jpl.nasa.gov/foundation/mission#Presents> ; " +
                             "<http://opencaesar.io/oml#hasSource> <http://example.com/tutorial/description/una1#C4> ; " +
-                            "<http://opencaesar.io/oml#hasSource> <http://example.com/tutorial/description/una1#I1> . " +
+                            "<http://opencaesar.io/oml#hasTarget> <http://example.com/tutorial/description/una1#I1> . " +
                             "} }");
             LOGGER.info("INSERT...");
             UpdateAction.execute(request, ds1);
@@ -223,7 +223,7 @@ public class OwlReasonIncrementallyJena1d {
                             "<http://example.com/tutorial/description/una1#C4> a <http://imce.jpl.nasa.gov/foundation/mission#Component> . " +
                             "<http://example.com/tutorial/description/una1#C4.I1> a <http://imce.jpl.nasa.gov/foundation/mission#Presents> ; " +
                             "<http://opencaesar.io/oml#hasSource> <http://example.com/tutorial/description/una1#C4> ; " +
-                            "<http://opencaesar.io/oml#hasSource> <http://example.com/tutorial/description/una1#I1> . " +
+                            "<http://opencaesar.io/oml#hasTarget> <http://example.com/tutorial/description/una1#I1> . " +
                             "} }");
             LOGGER.info("DELETE...");
             UpdateAction.execute(request, ds0);
